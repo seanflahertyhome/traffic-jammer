@@ -1,0 +1,914 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TrafficAlert - Smart Commute Planner</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <link rel="manifest" href="data:application/json,{
+        &quot;name&quot;: &quot;TrafficAlert&quot;,
+        &quot;short_name&quot;: &quot;TrafficAlert&quot;,
+        &quot;start_url&quot;: &quot;.&quot;,
+        &quot;display&quot;: &quot;standalone&quot;,
+        &quot;background_color&quot;: &quot;%231e293b&quot;,
+        &quot;theme_color&quot;: &quot;%233b82f6&quot;,
+        &quot;icons&quot;: [{
+            &quot;src&quot;: &quot;data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='45' fill='%233b82f6'/><path d='M30 55 L50 35 L70 55 L60 55 L60 70 L40 70 L40 55 Z' fill='white'/></svg>&quot;,
+            &quot;sizes&quot;: &quot;192x192&quot;,
+            &quot;type&quot;: &quot;image/svg+xml&quot;
+        }]
+    }">
+    <meta name="theme-color" content="#3b82f6">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <style>
+        .route-card {
+            transition: all 0.3s ease;
+        }
+        .route-card:hover {
+            transform: translateY(-2px);
+        }
+        .pulse-dot {
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        .slide-in {
+            animation: slideIn 0.3s ease;
+        }
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        #map {
+            height: 300px;
+            width: 100%;
+            border-radius: 0.75rem;
+        }
+        .traffic-indicator {
+            transition: all 0.3s ease;
+        }
+        .day-btn.active {
+            background: #3b82f6;
+            color: white;
+        }
+    </style>
+</head>
+<body class="bg-slate-900 min-h-screen text-white">
+    <!-- Header -->
+    <header class="bg-slate-800 border-b border-slate-700 sticky top-0 z-50">
+        <div class="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 bg-blue-500 rounded-xl flex items-center justify-center">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"></path>
+                    </svg>
+                </div>
+                <div>
+                    <h1 class="text-xl font-bold">TrafficAlert</h1>
+                    <p class="text-xs text-slate-400">Smart Commute Planner</p>
+                </div>
+            </div>
+            <button onclick="requestNotificationPermission()" id="notifBtn" class="p-2 rounded-lg bg-slate-700 hover:bg-slate-600 transition">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path>
+                </svg>
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="max-w-4xl mx-auto px-4 py-6">
+        <!-- Add Route Card -->
+        <div class="bg-slate-800 rounded-2xl p-6 mb-6 border border-slate-700">
+            <h2 class="text-lg font-semibold mb-4 flex items-center gap-2">
+                <svg class="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                </svg>
+                Add New Route
+            </h2>
+
+            <!-- Map Container -->
+            <div id="map" class="mb-4 bg-slate-700 flex items-center justify-center">
+                <div class="text-center text-slate-400">
+                    <svg class="w-12 h-12 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"></path>
+                    </svg>
+                    <p>Click to select locations on map</p>
+                    <p class="text-xs mt-1">Or enter addresses below</p>
+                </div>
+            </div>
+
+            <!-- Location Inputs -->
+            <div class="space-y-4 mb-4">
+                <div class="relative">
+                    <div class="absolute left-3 top-1/2 -translate-y-1/2 w-3 h-3 bg-green-500 rounded-full"></div>
+                    <input type="text" id="startLocation" placeholder="Start location" 
+                        class="w-full bg-slate-700 border border-slate-600 rounded-xl py-3 pl-10 pr-12 focus:outline-none focus:border-blue-500 transition">
+                    <button onclick="useCurrentLocation('start')" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-blue-400 transition">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                        </svg>
+                    </button>
+                </div>
+                
+                <div class="flex justify-center">
+                    <button onclick="swapLocations()" class="p-2 rounded-lg bg-slate-700 hover:bg-slate-600 transition" title="Swap locations">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"></path>
+                        </svg>
+                    </button>
+                </div>
+
+                <div class="relative">
+                    <div class="absolute left-3 top-1/2 -translate-y-1/2 w-3 h-3 bg-red-500 rounded-full"></div>
+                    <input type="text" id="endLocation" placeholder="End location" 
+                        class="w-full bg-slate-700 border border-slate-600 rounded-xl py-3 pl-10 pr-12 focus:outline-none focus:border-blue-500 transition">
+                    <button onclick="useCurrentLocation('end')" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-blue-400 transition">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Route Name -->
+            <div class="mb-4">
+                <input type="text" id="routeName" placeholder="Route name (e.g., Morning Commute)" 
+                    class="w-full bg-slate-700 border border-slate-600 rounded-xl py-3 px-4 focus:outline-none focus:border-blue-500 transition">
+            </div>
+
+            <!-- Time Selection -->
+            <div class="grid grid-cols-2 gap-4 mb-4">
+                <div>
+                    <label class="block text-sm text-slate-400 mb-2">Departure Time</label>
+                    <input type="time" id="departureTime" value="08:00"
+                        class="w-full bg-slate-700 border border-slate-600 rounded-xl py-3 px-4 focus:outline-none focus:border-blue-500 transition">
+                </div>
+                <div>
+                    <label class="block text-sm text-slate-400 mb-2">Alert Before</label>
+                    <select id="alertBefore" class="w-full bg-slate-700 border border-slate-600 rounded-xl py-3 px-4 focus:outline-none focus:border-blue-500 transition">
+                        <option value="5">5 minutes</option>
+                        <option value="10">10 minutes</option>
+                        <option value="15" selected>15 minutes</option>
+                        <option value="30">30 minutes</option>
+                        <option value="60">1 hour</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Days Selection -->
+            <div class="mb-6">
+                <label class="block text-sm text-slate-400 mb-2">Repeat on Days</label>
+                <div class="flex gap-2 flex-wrap">
+                    <button class="day-btn px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 transition text-sm" data-day="0">Sun</button>
+                    <button class="day-btn active px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 transition text-sm" data-day="1">Mon</button>
+                    <button class="day-btn active px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 transition text-sm" data-day="2">Tue</button>
+                    <button class="day-btn active px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 transition text-sm" data-day="3">Wed</button>
+                    <button class="day-btn active px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 transition text-sm" data-day="4">Thu</button>
+                    <button class="day-btn active px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 transition text-sm" data-day="5">Fri</button>
+                    <button class="day-btn px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 transition text-sm" data-day="6">Sat</button>
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="flex gap-3">
+                <button onclick="addRoute()" class="flex-1 bg-blue-500 hover:bg-blue-600 py-3 rounded-xl font-semibold transition flex items-center justify-center gap-2">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                    </svg>
+                    Add Route
+                </button>
+                <button onclick="addRouteWithReturn()" class="flex-1 bg-slate-700 hover:bg-slate-600 py-3 rounded-xl font-semibold transition flex items-center justify-center gap-2" title="Add route and reverse for round trip">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path>
+                    </svg>
+                    Add Round Trip
+                </button>
+            </div>
+        </div>
+
+        <!-- Traffic Status Banner -->
+        <div id="trafficBanner" class="bg-gradient-to-r from-green-600 to-green-500 rounded-xl p-4 mb-6 flex items-center gap-4 hidden">
+            <div class="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+            </div>
+            <div class="flex-1">
+                <h3 class="font-semibold">Traffic is light</h3>
+                <p class="text-sm text-white/80">All your routes are looking good right now</p>
+            </div>
+        </div>
+
+        <!-- Saved Routes -->
+        <div class="mb-6">
+            <h2 class="text-lg font-semibold mb-4 flex items-center gap-2">
+                <svg class="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
+                </svg>
+                Saved Routes
+                <span id="routeCount" class="text-sm text-slate-400 font-normal">(0)</span>
+            </h2>
+            <div id="routesList" class="space-y-4">
+                <!-- Routes will be rendered here -->
+                <div class="text-center py-8 text-slate-500">
+                    <svg class="w-16 h-16 mx-auto mb-4 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"></path>
+                    </svg>
+                    <p>No routes saved yet</p>
+                    <p class="text-sm mt-1">Add your first commute route above</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Data Sources Info -->
+        <div class="bg-slate-800 rounded-2xl p-6 border border-slate-700">
+            <h3 class="font-semibold mb-3 flex items-center gap-2">
+                <svg class="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                Traffic Data Sources
+            </h3>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div class="bg-slate-700 rounded-lg p-3 text-center">
+                    <div class="w-8 h-8 mx-auto mb-2 bg-blue-500 rounded-lg flex items-center justify-center text-sm font-bold">G</div>
+                    <p class="text-xs text-slate-400">Google Maps</p>
+                </div>
+                <div class="bg-slate-700 rounded-lg p-3 text-center">
+                    <div class="w-8 h-8 mx-auto mb-2 bg-cyan-500 rounded-lg flex items-center justify-center text-sm font-bold">W</div>
+                    <p class="text-xs text-slate-400">Waze</p>
+                </div>
+                <div class="bg-slate-700 rounded-lg p-3 text-center">
+                    <div class="w-8 h-8 mx-auto mb-2 bg-orange-500 rounded-lg flex items-center justify-center text-sm font-bold">H</div>
+                    <p class="text-xs text-slate-400">HERE Maps</p>
+                </div>
+                <div class="bg-slate-700 rounded-lg p-3 text-center">
+                    <div class="w-8 h-8 mx-auto mb-2 bg-purple-500 rounded-lg flex items-center justify-center text-sm font-bold">T</div>
+                    <p class="text-xs text-slate-400">TomTom</p>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="fixed bottom-4 left-4 right-4 md:left-auto md:right-4 md:w-96 bg-slate-800 border border-slate-700 rounded-xl p-4 shadow-2xl transform translate-y-full opacity-0 transition-all duration-300 z-50">
+        <div class="flex items-start gap-3">
+            <div id="toastIcon" class="w-10 h-10 bg-blue-500 rounded-xl flex items-center justify-center flex-shrink-0">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                </svg>
+            </div>
+            <div class="flex-1">
+                <h4 id="toastTitle" class="font-semibold">Success</h4>
+                <p id="toastMessage" class="text-sm text-slate-400">Route has been added</p>
+            </div>
+            <button onclick="hideToast()" class="text-slate-400 hover:text-white transition">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+            </button>
+        </div>
+    </div>
+
+    <!-- Route Detail Modal -->
+    <div id="routeModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-slate-800 rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+            <div class="p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-xl font-bold" id="modalTitle">Route Details</h3>
+                    <button onclick="closeModal()" class="text-slate-400 hover:text-white transition">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+                <div id="modalContent">
+                    <!-- Dynamic content -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // App State
+        let routes = JSON.parse(localStorage.getItem('trafficAlertRoutes')) || [];
+        let map = null;
+        let directionsService = null;
+        let directionsRenderer = null;
+        let startMarker = null;
+        let endMarker = null;
+        let selectedDays = [1, 2, 3, 4, 5]; // Mon-Fri default
+        let checkInterval = null;
+
+        // Initialize App
+        document.addEventListener('DOMContentLoaded', () => {
+            initializeDayButtons();
+            renderRoutes();
+            initMap();
+            startRouteChecker();
+            updateTrafficBanner();
+            
+            // Register service worker for PWA
+            if ('serviceWorker' in navigator) {
+                registerServiceWorker();
+            }
+        });
+
+        // Service Worker Registration
+        async function registerServiceWorker() {
+            try {
+                const swCode = `
+                    self.addEventListener('install', (e) => {
+                        self.skipWaiting();
+                    });
+                    self.addEventListener('activate', (e) => {
+                        e.waitUntil(clients.claim());
+                    });
+                    self.addEventListener('push', (e) => {
+                        const data = e.data?.json() || {};
+                        self.registration.showNotification(data.title || 'TrafficAlert', {
+                            body: data.body || 'Time to check your route!',
+                            icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="45" fill="%233b82f6"/></svg>',
+                            badge: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="45" fill="%233b82f6"/></svg>',
+                            data: data.url,
+                            actions: [
+                                { action: 'open', title: 'Open Maps' },
+                                { action: 'dismiss', title: 'Dismiss' }
+                            ]
+                        });
+                    });
+                    self.addEventListener('notificationclick', (e) => {
+                        e.notification.close();
+                        if (e.action === 'open' || !e.action) {
+                            if (e.notification.data) {
+                                clients.openWindow(e.notification.data);
+                            }
+                        }
+                    });
+                `;
+                const blob = new Blob([swCode], { type: 'application/javascript' });
+                const swUrl = URL.createObjectURL(blob);
+                await navigator.serviceWorker.register(swUrl);
+                console.log('Service Worker registered');
+            } catch (error) {
+                console.log('Service Worker registration failed:', error);
+            }
+        }
+
+        // Initialize Map (simulated without API key)
+        function initMap() {
+            const mapContainer = document.getElementById('map');
+            
+            // Check if Google Maps API is available
+            if (typeof google !== 'undefined' && google.maps) {
+                map = new google.maps.Map(mapContainer, {
+                    center: { lat: 40.7128, lng: -74.0060 },
+                    zoom: 12,
+                    styles: [
+                        { elementType: "geometry", stylers: [{ color: "#1e293b" }] },
+                        { elementType: "labels.text.stroke", stylers: [{ color: "#1e293b" }] },
+                        { elementType: "labels.text.fill", stylers: [{ color: "#94a3b8" }] }
+                    ]
+                });
+                directionsService = new google.maps.DirectionsService();
+                directionsRenderer = new google.maps.DirectionsRenderer({ map });
+            } else {
+                // Simulated map interface
+                mapContainer.innerHTML = `
+                    <div class="h-full bg-gradient-to-br from-slate-700 to-slate-800 rounded-xl flex flex-col items-center justify-center cursor-pointer hover:from-slate-600 hover:to-slate-700 transition" onclick="simulateMapClick()">
+                        <svg class="w-16 h-16 text-blue-400 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"></path>
+                        </svg>
+                        <p class="text-slate-300 font-medium">Interactive Map</p>
+                        <p class="text-xs text-slate-400 mt-1">Enter addresses below or click to select</p>
+                        <div class="mt-4 flex gap-2">
+                            <span class="px-2 py-1 bg-green-500/20 text-green-400 text-xs rounded-full flex items-center gap-1">
+                                <span class="w-2 h-2 bg-green-400 rounded-full"></span> Start
+                            </span>
+                            <span class="px-2 py-1 bg-red-500/20 text-red-400 text-xs rounded-full flex items-center gap-1">
+                                <span class="w-2 h-2 bg-red-400 rounded-full"></span> End
+                            </span>
+                        </div>
+                    </div>
+                `;
+            }
+        }
+
+        function simulateMapClick() {
+            showToast('info', 'Map Selection', 'Enter addresses in the fields below or use current location');
+        }
+
+        // Day Button Handlers
+        function initializeDayButtons() {
+            document.querySelectorAll('.day-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    btn.classList.toggle('active');
+                    const day = parseInt(btn.dataset.day);
+                    if (selectedDays.includes(day)) {
+                        selectedDays = selectedDays.filter(d => d !== day);
+                    } else {
+                        selectedDays.push(day);
+                    }
+                });
+            });
+        }
+
+        // Location Functions
+        function useCurrentLocation(type) {
+            if (!navigator.geolocation) {
+                showToast('error', 'Error', 'Geolocation is not supported by your browser');
+                return;
+            }
+
+            showToast('info', 'Locating...', 'Getting your current position');
+
+            navigator.geolocation.getCurrentPosition(
+                async (position) => {
+                    const { latitude, longitude } = position.coords;
+                    const address = await reverseGeocode(latitude, longitude);
+                    
+                    if (type === 'start') {
+                        document.getElementById('startLocation').value = address;
+                    } else {
+                        document.getElementById('endLocation').value = address;
+                    }
+                    showToast('success', 'Location Found', address);
+                },
+                (error) => {
+                    showToast('error', 'Error', 'Unable to get your location');
+                }
+            );
+        }
+
+        async function reverseGeocode(lat, lng) {
+            // In production, use Google Geocoding API
+            return `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+        }
+
+        function swapLocations() {
+            const start = document.getElementById('startLocation');
+            const end = document.getElementById('endLocation');
+            const temp = start.value;
+            start.value = end.value;
+            end.value = temp;
+        }
+
+        // Route Management
+        function addRoute(isReturn = false, returnTime = null) {
+            const start = document.getElementById('startLocation').value.trim();
+            const end = document.getElementById('endLocation').value.trim();
+            const name = document.getElementById('routeName').value.trim() || (isReturn ? 'Return Trip' : 'My Commute');
+            const time = returnTime || document.getElementById('departureTime').value;
+            const alertBefore = parseInt(document.getElementById('alertBefore').value);
+
+            if (!start || !end) {
+                showToast('error', 'Missing Information', 'Please enter both start and end locations');
+                return null;
+            }
+
+            const route = {
+                id: Date.now() + Math.random(),
+                name: name,
+                start: isReturn ? end : start,
+                end: isReturn ? start : end,
+                time: time,
+                alertBefore: alertBefore,
+                days: [...selectedDays],
+                enabled: true,
+                createdAt: new Date().toISOString(),
+                lastNotified: null
+            };
+
+            routes.push(route);
+            saveRoutes();
+            renderRoutes();
+            updateTrafficBanner();
+            
+            if (!isReturn) {
+                showToast('success', 'Route Added', `"${name}" has been saved`);
+                clearForm();
+            }
+            
+            return route;
+        }
+
+        function addRouteWithReturn() {
+            const start = document.getElementById('startLocation').value.trim();
+            const end = document.getElementById('endLocation').value.trim();
+            
+            if (!start || !end) {
+                showToast('error', 'Missing Information', 'Please enter both start and end locations');
+                return;
+            }
+
+            const name = document.getElementById('routeName').value.trim() || 'My Commute';
+            const departureTime = document.getElementById('departureTime').value;
+            
+            // Add morning route
+            document.getElementById('routeName').value = name + ' (To Work)';
+            const route1 = addRoute();
+            
+            // Calculate return time (8 hours later by default)
+            const [hours, mins] = departureTime.split(':').map(Number);
+            let returnHours = (hours + 9) % 24;
+            const returnTime = `${returnHours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
+            
+            // Add return route
+            document.getElementById('routeName').value = name + ' (Return Home)';
+            addRoute(true, returnTime);
+            
+            showToast('success', 'Round Trip Added', 'Both outbound and return routes have been saved');
+            clearForm();
+        }
+
+        function duplicateRoute(id) {
+            const route = routes.find(r => r.id === id);
+            if (!route) return;
+
+            const newRoute = {
+                ...route,
+                id: Date.now() + Math.random(),
+                name: route.name + ' (Copy)',
+                createdAt: new Date().toISOString(),
+                lastNotified: null
+            };
+
+            routes.push(newRoute);
+            saveRoutes();
+            renderRoutes();
+            showToast('success', 'Route Duplicated', `"${newRoute.name}" has been created`);
+        }
+
+        function reverseRoute(id) {
+            const route = routes.find(r => r.id === id);
+            if (!route) return;
+
+            const newRoute = {
+                ...route,
+                id: Date.now() + Math.random(),
+                name: route.name + ' (Reverse)',
+                start: route.end,
+                end: route.start,
+                createdAt: new Date().toISOString(),
+                lastNotified: null
+            };
+
+            routes.push(newRoute);
+            saveRoutes();
+            renderRoutes();
+            showToast('success', 'Reverse Route Created', `"${newRoute.name}" has been added`);
+        }
+
+        function toggleRoute(id) {
+            const route = routes.find(r => r.id === id);
+            if (route) {
+                route.enabled = !route.enabled;
+                saveRoutes();
+                renderRoutes();
+            }
+        }
+
+        function deleteRoute(id) {
+            routes = routes.filter(r => r.id !== id);
+            saveRoutes();
+            renderRoutes();
+            updateTrafficBanner();
+            showToast('success', 'Route Deleted', 'The route has been removed');
+        }
+
+        function clearForm() {
+            document.getElementById('startLocation').value = '';
+            document.getElementById('endLocation').value = '';
+            document.getElementById('routeName').value = '';
+        }
+
+        function saveRoutes() {
+            localStorage.setItem('trafficAlertRoutes', JSON.stringify(routes));
+        }
+
+        // Render Routes
+        function renderRoutes() {
+            const container = document.getElementById('routesList');
+            const countEl = document.getElementById('routeCount');
+            countEl.textContent = `(${routes.length})`;
+
+            if (routes.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center py-8 text-slate-500">
+                        <svg class="w-16 h-16 mx-auto mb-4 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"></path>
+                        </svg>
+                        <p>No routes saved yet</p>
+                        <p class="text-sm mt-1">Add your first commute route above</p>
+                    </div>
+                `;
+                return;
+            }
+
+            const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+            container.innerHTML = routes.map(route => `
+                <div class="route-card bg-slate-800 rounded-xl p-4 border border-slate-700 ${!route.enabled ? 'opacity-50' : ''}">
+                    <div class="flex items-start justify-between mb-3">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 rounded-xl ${route.enabled ? 'bg-blue-500' : 'bg-slate-600'} flex items-center justify-center">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"></path>
+                                </svg>
+                            </div>
+                            <div>
+                                <h3 class="font-semibold">${escapeHtml(route.name)}</h3>
+                                <p class="text-sm text-slate-400">${route.time} • Alert ${route.alertBefore}min before</p>
+                            </div>
+                        </div>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" ${route.enabled ? 'checked' : ''} onchange="toggleRoute(${route.id})" class="sr-only peer">
+                            <div class="w-11 h-6 bg-slate-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-500"></div>
+                        </label>
+                    </div>
+                    
+                    <div class="space-y-2 mb-3">
+                        <div class="flex items-center gap-2 text-sm">
+                            <div class="w-2 h-2 bg-green-500 rounded-full"></div>
+                            <span class="text-slate-300 truncate">${escapeHtml(route.start)}</span>
+                        </div>
+                        <div class="flex items-center gap-2 text-sm">
+                            <div class="w-2 h-2 bg-red-500 rounded-full"></div>
+                            <span class="text-slate-300 truncate">${escapeHtml(route.end)}</span>
+                        </div>
+                    </div>
+
+                    <div class="flex gap-1 mb-3 flex-wrap">
+                        ${dayNames.map((day, i) => `
+                            <span class="px-2 py-1 text-xs rounded ${route.days.includes(i) ? 'bg-blue-500/20 text-blue-400' : 'bg-slate-700 text-slate-500'}">${day}</span>
+                        `).join('')}
+                    </div>
+
+                    <div class="flex gap-2 pt-3 border-t border-slate-700">
+                        <button onclick="checkRouteNow(${route.id})" class="flex-1 py-2 px-3 bg-blue-500 hover:bg-blue-600 rounded-lg text-sm font-medium transition flex items-center justify-center gap-1">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                            </svg>
+                            Check Now
+                        </button>
+                        <button onclick="duplicateRoute(${route.id})" class="p-2 bg-slate-700 hover:bg-slate-600 rounded-lg transition" title="Duplicate">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+                            </svg>
+                        </button>
+                        <button onclick="reverseRoute(${route.id})" class="p-2 bg-slate-700 hover:bg-slate-600 rounded-lg transition" title="Create Reverse">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path>
+                            </svg>
+                        </button>
+                        <button onclick="deleteRoute(${route.id})" class="p-2 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-lg transition" title="Delete">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Traffic Data Fetching (Simulated - in production use real APIs)
+        async function fetchTrafficData(start, end) {
+            // Simulate API call delay
+            await new Promise(resolve => setTimeout(resolve, 500));
+
+            // Simulated traffic data from multiple sources
+            const sources = ['Google', 'Waze', 'HERE', 'TomTom'];
+            const baseTime = 25 + Math.floor(Math.random() * 20); // 25-45 min base
+            
+            const results = sources.map(source => ({
+                source,
+                duration: baseTime + Math.floor(Math.random() * 10) - 5,
+                trafficLevel: ['light', 'moderate', 'heavy'][Math.floor(Math.random() * 3)],
+                distance: (5 + Math.random() * 10).toFixed(1),
+                incidents: Math.floor(Math.random() * 3)
+            }));
+
+            // Find best route
+            const best = results.reduce((a, b) => a.duration < b.duration ? a : b);
+
+            return {
+                sources: results,
+                bestRoute: best,
+                mapsUrl: generateMapsUrl(start, end)
+            };
+        }
+
+        function generateMapsUrl(start, end) {
+            const startEncoded = encodeURIComponent(start);
+            const endEncoded = encodeURIComponent(end);
+            return `https://www.google.com/maps/dir/?api=1&origin=${startEncoded}&destination=${endEncoded}&travelmode=driving`;
+        }
+
+        // Check Route Now
+        async function checkRouteNow(id) {
+            const route = routes.find(r => r.id === id);
+            if (!route) return;
+
+            showToast('info', 'Checking Traffic...', 'Fetching data from multiple sources');
+
+            const trafficData = await fetchTrafficData(route.start, route.end);
+
+            const modal = document.getElementById('routeModal');
+            const title = document.getElementById('modalTitle');
+            const content = document.getElementById('modalContent');
+
+            title.textContent = route.name;
+
+            const trafficColors = {
+                light: 'text-green-400 bg-green-500/20',
+                moderate: 'text-yellow-400 bg-yellow-500/20',
+                heavy: 'text-red-400 bg-red-500/20'
+            };
+
+            content.innerHTML = `
+                <div class="space-y-4">
+                    <div class="bg-slate-700 rounded-xl p-4">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-slate-400">Best Route</span>
+                            <span class="px-2 py-1 ${trafficColors[trafficData.bestRoute.trafficLevel]} rounded-full text-xs font-medium capitalize">${trafficData.bestRoute.trafficLevel} traffic</span>
+                        </div>
+                        <div class="text-2xl font-bold">${trafficData.bestRoute.duration} min</div>
+                        <div class="text-sm text-slate-400">${trafficData.bestRoute.distance} miles via ${trafficData.bestRoute.source}</div>
+                    </div>
+
+                    <div class="space-y-2">
+                        <h4 class="text-sm font-medium text-slate-400">All Sources</h4>
+                        ${trafficData.sources.map(s => `
+                            <div class="flex items-center justify-between p-3 bg-slate-700 rounded-lg">
+                                <div class="flex items-center gap-2">
+                                    <span class="w-6 h-6 bg-blue-500 rounded text-xs font-bold flex items-center justify-center">${s.source[0]}</span>
+                                    <span>${s.source}</span>
+                                </div>
+                                <div class="text-right">
+                                    <div class="font-semibold">${s.duration} min</div>
+                                    <div class="text-xs ${trafficColors[s.trafficLevel].split(' ')[0]} capitalize">${s.trafficLevel}</div>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+
+                    <a href="${trafficData.mapsUrl}" target="_blank" class="block w-full py-3 bg-blue-500 hover:bg-blue-600 rounded-xl font-semibold text-center transition">
+                        Open in Google Maps
+                    </a>
+                </div>
+            `;
+
+            modal.classList.remove('hidden');
+        }
+
+        function closeModal() {
+            document.getElementById('routeModal').classList.add('hidden');
+        }
+
+        // Route Checker (runs every minute)
+        function startRouteChecker() {
+            checkInterval = setInterval(checkScheduledRoutes, 60000); // Check every minute
+            checkScheduledRoutes(); // Initial check
+        }
+
+        async function checkScheduledRoutes() {
+            const now = new Date();
+            const currentDay = now.getDay();
+            const currentMinutes = now.getHours() * 60 + now.getMinutes();
+
+            for (const route of routes) {
+                if (!route.enabled || !route.days.includes(currentDay)) continue;
+
+                const [hours, mins] = route.time.split(':').map(Number);
+                const routeMinutes = hours * 60 + mins;
+                const alertTime = routeMinutes - route.alertBefore;
+
+                // Check if it's time to alert (within 1 minute window)
+                if (Math.abs(currentMinutes - alertTime) <= 1) {
+                    // Check if already notified today
+                    const today = now.toDateString();
+                    if (route.lastNotified === today) continue;
+
+                    // Update last notified
+                    route.lastNotified = today;
+                    saveRoutes();
+
+                    // Fetch traffic and notify
+                    const trafficData = await fetchTrafficData(route.start, route.end);
+                    sendNotification(route, trafficData);
+                }
+            }
+        }
+
+        // Notifications
+        async function requestNotificationPermission() {
+            if (!('Notification' in window)) {
+                showToast('error', 'Not Supported', 'Notifications are not supported in this browser');
+                return;
+            }
+
+            const permission = await Notification.requestPermission();
+            
+            if (permission === 'granted') {
+                showToast('success', 'Notifications Enabled', 'You will receive traffic alerts');
+                document.getElementById('notifBtn').classList.add('text-blue-400');
+            } else {
+                showToast('error', 'Permission Denied', 'Enable notifications in your browser settings');
+            }
+        }
+
+        function sendNotification(route, trafficData) {
+            if (Notification.permission !== 'granted') return;
+
+            const notification = new Notification(`🚗 ${route.name}`, {
+                body: `${trafficData.bestRoute.duration} min via ${trafficData.bestRoute.source} (${trafficData.bestRoute.trafficLevel} traffic)`,
+                icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="45" fill="%233b82f6"/><path d="M30 55 L50 35 L70 55 L60 55 L60 70 L40 70 L40 55 Z" fill="white"/></svg>',
+                tag: `route-${route.id}`,
+                requireInteraction: true,
+                data: trafficData.mapsUrl
+            });
+
+            notification.onclick = () => {
+                window.open(trafficData.mapsUrl, '_blank');
+                notification.close();
+            };
+        }
+
+        // Update Traffic Banner
+        function updateTrafficBanner() {
+            const banner = document.getElementById('trafficBanner');
+            if (routes.length > 0 && routes.some(r => r.enabled)) {
+                banner.classList.remove('hidden');
+            } else {
+                banner.classList.add('hidden');
+            }
+        }
+
+        // Toast Notifications
+        function showToast(type, title, message) {
+            const toast = document.getElementById('toast');
+            const icon = document.getElementById('toastIcon');
+            const titleEl = document.getElementById('toastTitle');
+            const messageEl = document.getElementById('toastMessage');
+
+            titleEl.textContent = title;
+            messageEl.textContent = message;
+
+            const iconColors = {
+                success: 'bg-green-500',
+                error: 'bg-red-500',
+                info: 'bg-blue-500',
+                warning: 'bg-yellow-500'
+            };
+
+            const icons = {
+                success: '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>',
+                error: '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>',
+                info: '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>',
+                warning: '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>'
+            };
+
+            icon.className = `w-10 h-10 ${iconColors[type]} rounded-xl flex items-center justify-center flex-shrink-0`;
+            icon.innerHTML = `<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">${icons[type]}</svg>`;
+
+            toast.classList.remove('translate-y-full', 'opacity-0');
+            
+            setTimeout(hideToast, 4000);
+        }
+
+        function hideToast() {
+            const toast = document.getElementById('toast');
+            toast.classList.add('translate-y-full', 'opacity-0');
+        }
+
+        // Utility Functions
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Close modal on outside click
+        document.getElementById('routeModal').addEventListener('click', (e) => {
+            if (e.target.id === 'routeModal') {
+                closeModal();
+            }
+        });
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                closeModal();
+            }
+        });
+    </script>
+
+    <!-- Google Maps API - Replace YOUR_API_KEY with actual key for production -->
+    <!-- <script src="https://maps.googleapis.com/maps/api/js?key=YOUR_API_KEY&libraries=places&callback=initMap" async defer></script> -->
+</body>
+</html>
