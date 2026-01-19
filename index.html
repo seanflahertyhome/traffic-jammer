@@ -43,7 +43,7 @@
             to { transform: translateX(0); opacity: 1; }
         }
         #map {
-            height: 300px;
+            height: 350px;
             width: 100%;
             border-radius: 0.75rem;
         }
@@ -53,6 +53,55 @@
         .day-btn.active {
             background: #3b82f6;
             color: white;
+        }
+        .pac-container {
+            background-color: #1e293b;
+            border: 1px solid #475569;
+            border-radius: 0.75rem;
+            margin-top: 4px;
+            font-family: inherit;
+        }
+        .pac-item {
+            padding: 8px 12px;
+            color: #e2e8f0;
+            border-top: 1px solid #334155;
+            cursor: pointer;
+        }
+        .pac-item:first-child {
+            border-top: none;
+        }
+        .pac-item:hover {
+            background-color: #334155;
+        }
+        .pac-item-query {
+            color: #ffffff;
+            font-size: 14px;
+        }
+        .pac-matched {
+            color: #3b82f6;
+        }
+        .pac-icon {
+            display: none;
+        }
+        .selection-mode {
+            animation: pulse 1s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.5); }
+            50% { box-shadow: 0 0 0 8px rgba(59, 130, 246, 0); }
+        }
+        .map-instruction {
+            position: absolute;
+            bottom: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(30, 41, 59, 0.9);
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 12px;
+            color: white;
+            z-index: 10;
+            pointer-events: none;
         }
     </style>
 </head>
@@ -90,14 +139,39 @@
                 Add New Route
             </h2>
 
+            <!-- Map Selection Mode -->
+            <div class="flex gap-2 mb-4">
+                <button id="selectStartBtn" onclick="setMapSelectionMode('start')" class="flex-1 py-2 px-4 bg-slate-700 hover:bg-green-600 rounded-lg text-sm font-medium transition flex items-center justify-center gap-2">
+                    <div class="w-3 h-3 bg-green-500 rounded-full"></div>
+                    Click Map for Start
+                </button>
+                <button id="selectEndBtn" onclick="setMapSelectionMode('end')" class="flex-1 py-2 px-4 bg-slate-700 hover:bg-red-600 rounded-lg text-sm font-medium transition flex items-center justify-center gap-2">
+                    <div class="w-3 h-3 bg-red-500 rounded-full"></div>
+                    Click Map for End
+                </button>
+            </div>
+
             <!-- Map Container -->
-            <div id="map" class="mb-4 bg-slate-700 flex items-center justify-center">
-                <div class="text-center text-slate-400">
-                    <svg class="w-12 h-12 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"></path>
-                    </svg>
-                    <p>Click to select locations on map</p>
-                    <p class="text-xs mt-1">Or enter addresses below</p>
+            <div id="mapContainer" class="relative mb-4">
+                <div id="map" class="bg-slate-700"></div>
+                <div id="mapInstruction" class="map-instruction hidden">Click on the map to select location</div>
+            </div>
+
+            <!-- Coordinates Display -->
+            <div id="coordsDisplay" class="grid grid-cols-2 gap-4 mb-4 hidden">
+                <div class="bg-slate-700 rounded-lg p-3">
+                    <div class="flex items-center gap-2 mb-1">
+                        <div class="w-2 h-2 bg-green-500 rounded-full"></div>
+                        <span class="text-xs text-slate-400">Start Coordinates</span>
+                    </div>
+                    <p id="startCoords" class="text-sm font-mono">Not selected</p>
+                </div>
+                <div class="bg-slate-700 rounded-lg p-3">
+                    <div class="flex items-center gap-2 mb-1">
+                        <div class="w-2 h-2 bg-red-500 rounded-full"></div>
+                        <span class="text-xs text-slate-400">End Coordinates</span>
+                    </div>
+                    <p id="endCoords" class="text-sm font-mono">Not selected</p>
                 </div>
             </div>
 
@@ -105,14 +179,21 @@
             <div class="space-y-4 mb-4">
                 <div class="relative">
                     <div class="absolute left-3 top-1/2 -translate-y-1/2 w-3 h-3 bg-green-500 rounded-full"></div>
-                    <input type="text" id="startLocation" placeholder="Start location" 
-                        class="w-full bg-slate-700 border border-slate-600 rounded-xl py-3 pl-10 pr-12 focus:outline-none focus:border-blue-500 transition">
-                    <button onclick="useCurrentLocation('start')" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-blue-400 transition">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path>
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path>
-                        </svg>
-                    </button>
+                    <input type="text" id="startLocation" placeholder="Start location (type or click map)" 
+                        class="w-full bg-slate-700 border border-slate-600 rounded-xl py-3 pl-10 pr-24 focus:outline-none focus:border-blue-500 transition">
+                    <div class="absolute right-3 top-1/2 -translate-y-1/2 flex gap-1">
+                        <button onclick="clearLocation('start')" class="p-1 text-slate-400 hover:text-red-400 transition" title="Clear">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                            </svg>
+                        </button>
+                        <button onclick="useCurrentLocation('start')" class="p-1 text-slate-400 hover:text-blue-400 transition" title="Use current location">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                            </svg>
+                        </button>
+                    </div>
                 </div>
                 
                 <div class="flex justify-center">
@@ -125,14 +206,21 @@
 
                 <div class="relative">
                     <div class="absolute left-3 top-1/2 -translate-y-1/2 w-3 h-3 bg-red-500 rounded-full"></div>
-                    <input type="text" id="endLocation" placeholder="End location" 
-                        class="w-full bg-slate-700 border border-slate-600 rounded-xl py-3 pl-10 pr-12 focus:outline-none focus:border-blue-500 transition">
-                    <button onclick="useCurrentLocation('end')" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-blue-400 transition">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path>
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path>
-                        </svg>
-                    </button>
+                    <input type="text" id="endLocation" placeholder="End location (type or click map)" 
+                        class="w-full bg-slate-700 border border-slate-600 rounded-xl py-3 pl-10 pr-24 focus:outline-none focus:border-blue-500 transition">
+                    <div class="absolute right-3 top-1/2 -translate-y-1/2 flex gap-1">
+                        <button onclick="clearLocation('end')" class="p-1 text-slate-400 hover:text-red-400 transition" title="Clear">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                            </svg>
+                        </button>
+                        <button onclick="useCurrentLocation('end')" class="p-1 text-slate-400 hover:text-blue-400 transition" title="Use current location">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                            </svg>
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -302,14 +390,19 @@
         let directionsRenderer = null;
         let startMarker = null;
         let endMarker = null;
+        let startCoordinates = null;
+        let endCoordinates = null;
+        let mapSelectionMode = null; // 'start' or 'end'
         let selectedDays = [1, 2, 3, 4, 5]; // Mon-Fri default
         let checkInterval = null;
+        let startAutocomplete = null;
+        let endAutocomplete = null;
+        let geocoder = null;
 
         // Initialize App
         document.addEventListener('DOMContentLoaded', () => {
             initializeDayButtons();
             renderRoutes();
-            initMap();
             startRouteChecker();
             updateTrafficBanner();
             
@@ -318,6 +411,352 @@
                 registerServiceWorker();
             }
         });
+
+        // Initialize Google Maps
+        function initMap() {
+            const mapContainer = document.getElementById('map');
+            
+            // Dark mode map styles
+            const darkMapStyles = [
+                { elementType: "geometry", stylers: [{ color: "#1e293b" }] },
+                { elementType: "labels.text.stroke", stylers: [{ color: "#1e293b" }] },
+                { elementType: "labels.text.fill", stylers: [{ color: "#94a3b8" }] },
+                { featureType: "administrative.locality", elementType: "labels.text.fill", stylers: [{ color: "#cbd5e1" }] },
+                { featureType: "poi", elementType: "labels.text.fill", stylers: [{ color: "#64748b" }] },
+                { featureType: "poi.park", elementType: "geometry", stylers: [{ color: "#1e3a2f" }] },
+                { featureType: "poi.park", elementType: "labels.text.fill", stylers: [{ color: "#4ade80" }] },
+                { featureType: "road", elementType: "geometry", stylers: [{ color: "#334155" }] },
+                { featureType: "road", elementType: "geometry.stroke", stylers: [{ color: "#475569" }] },
+                { featureType: "road.highway", elementType: "geometry", stylers: [{ color: "#475569" }] },
+                { featureType: "road.highway", elementType: "geometry.stroke", stylers: [{ color: "#64748b" }] },
+                { featureType: "road.highway", elementType: "labels.text.fill", stylers: [{ color: "#f1f5f9" }] },
+                { featureType: "transit", elementType: "geometry", stylers: [{ color: "#334155" }] },
+                { featureType: "transit.station", elementType: "labels.text.fill", stylers: [{ color: "#94a3b8" }] },
+                { featureType: "water", elementType: "geometry", stylers: [{ color: "#0f172a" }] },
+                { featureType: "water", elementType: "labels.text.fill", stylers: [{ color: "#3b82f6" }] }
+            ];
+
+            // Default center (will try to get user's location)
+            const defaultCenter = { lat: 40.7128, lng: -74.0060 };
+
+            map = new google.maps.Map(mapContainer, {
+                center: defaultCenter,
+                zoom: 12,
+                styles: darkMapStyles,
+                disableDefaultUI: false,
+                zoomControl: true,
+                mapTypeControl: false,
+                streetViewControl: false,
+                fullscreenControl: true
+            });
+
+            // Initialize services
+            directionsService = new google.maps.DirectionsService();
+            directionsRenderer = new google.maps.DirectionsRenderer({
+                map: map,
+                suppressMarkers: true, // We'll use custom markers
+                polylineOptions: {
+                    strokeColor: '#3b82f6',
+                    strokeWeight: 5,
+                    strokeOpacity: 0.8
+                }
+            });
+            geocoder = new google.maps.Geocoder();
+
+            // Initialize autocomplete for start location
+            startAutocomplete = new google.maps.places.Autocomplete(
+                document.getElementById('startLocation'),
+                { types: ['geocode', 'establishment'] }
+            );
+            startAutocomplete.addListener('place_changed', () => {
+                const place = startAutocomplete.getPlace();
+                if (place.geometry) {
+                    const location = place.geometry.location;
+                    startCoordinates = { lat: location.lat(), lng: location.lng() };
+                    updateMarker('start', startCoordinates);
+                    updateCoordsDisplay();
+                    updateRoute();
+                    fitMapToBounds();
+                }
+            });
+
+            // Initialize autocomplete for end location
+            endAutocomplete = new google.maps.places.Autocomplete(
+                document.getElementById('endLocation'),
+                { types: ['geocode', 'establishment'] }
+            );
+            endAutocomplete.addListener('place_changed', () => {
+                const place = endAutocomplete.getPlace();
+                if (place.geometry) {
+                    const location = place.geometry.location;
+                    endCoordinates = { lat: location.lat(), lng: location.lng() };
+                    updateMarker('end', endCoordinates);
+                    updateCoordsDisplay();
+                    updateRoute();
+                    fitMapToBounds();
+                }
+            });
+
+            // Map click handler
+            map.addListener('click', (event) => {
+                if (mapSelectionMode) {
+                    const clickedLocation = {
+                        lat: event.latLng.lat(),
+                        lng: event.latLng.lng()
+                    };
+                    
+                    if (mapSelectionMode === 'start') {
+                        startCoordinates = clickedLocation;
+                        updateMarker('start', clickedLocation);
+                        reverseGeocodeAndFill(clickedLocation, 'startLocation');
+                    } else if (mapSelectionMode === 'end') {
+                        endCoordinates = clickedLocation;
+                        updateMarker('end', clickedLocation);
+                        reverseGeocodeAndFill(clickedLocation, 'endLocation');
+                    }
+                    
+                    updateCoordsDisplay();
+                    updateRoute();
+                    
+                    // Clear selection mode after click
+                    clearMapSelectionMode();
+                }
+            });
+
+            // Try to get user's current location for centering
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        const pos = {
+                            lat: position.coords.latitude,
+                            lng: position.coords.longitude
+                        };
+                        map.setCenter(pos);
+                    },
+                    () => {
+                        console.log('Geolocation failed, using default center');
+                    }
+                );
+            }
+
+            // Show coordinates display
+            document.getElementById('coordsDisplay').classList.remove('hidden');
+        }
+
+        // Set map selection mode
+        function setMapSelectionMode(mode) {
+            mapSelectionMode = mode;
+            
+            // Update button styles
+            const startBtn = document.getElementById('selectStartBtn');
+            const endBtn = document.getElementById('selectEndBtn');
+            const instruction = document.getElementById('mapInstruction');
+            
+            startBtn.classList.remove('bg-green-600', 'selection-mode');
+            endBtn.classList.remove('bg-red-600', 'selection-mode');
+            
+            if (mode === 'start') {
+                startBtn.classList.add('bg-green-600', 'selection-mode');
+                instruction.textContent = 'Click on the map to select START location';
+                instruction.classList.remove('hidden');
+            } else if (mode === 'end') {
+                endBtn.classList.add('bg-red-600', 'selection-mode');
+                instruction.textContent = 'Click on the map to select END location';
+                instruction.classList.remove('hidden');
+            }
+            
+            // Change cursor
+            if (map) {
+                map.setOptions({ draggableCursor: 'crosshair' });
+            }
+        }
+
+        function clearMapSelectionMode() {
+            mapSelectionMode = null;
+            const startBtn = document.getElementById('selectStartBtn');
+            const endBtn = document.getElementById('selectEndBtn');
+            const instruction = document.getElementById('mapInstruction');
+            
+            startBtn.classList.remove('bg-green-600', 'selection-mode');
+            endBtn.classList.remove('bg-red-600', 'selection-mode');
+            instruction.classList.add('hidden');
+            
+            if (map) {
+                map.setOptions({ draggableCursor: null });
+            }
+        }
+
+        // Update or create marker
+        function updateMarker(type, position) {
+            const markerOptions = {
+                position: position,
+                map: map,
+                draggable: true,
+                animation: google.maps.Animation.DROP
+            };
+
+            if (type === 'start') {
+                if (startMarker) {
+                    startMarker.setPosition(position);
+                } else {
+                    markerOptions.icon = {
+                        path: google.maps.SymbolPath.CIRCLE,
+                        scale: 12,
+                        fillColor: '#22c55e',
+                        fillOpacity: 1,
+                        strokeColor: '#ffffff',
+                        strokeWeight: 3
+                    };
+                    markerOptions.label = {
+                        text: 'A',
+                        color: '#ffffff',
+                        fontSize: '11px',
+                        fontWeight: 'bold'
+                    };
+                    startMarker = new google.maps.Marker(markerOptions);
+                    
+                    // Add drag listener
+                    startMarker.addListener('dragend', (event) => {
+                        startCoordinates = { lat: event.latLng.lat(), lng: event.latLng.lng() };
+                        reverseGeocodeAndFill(startCoordinates, 'startLocation');
+                        updateCoordsDisplay();
+                        updateRoute();
+                    });
+                }
+            } else if (type === 'end') {
+                if (endMarker) {
+                    endMarker.setPosition(position);
+                } else {
+                    markerOptions.icon = {
+                        path: google.maps.SymbolPath.CIRCLE,
+                        scale: 12,
+                        fillColor: '#ef4444',
+                        fillOpacity: 1,
+                        strokeColor: '#ffffff',
+                        strokeWeight: 3
+                    };
+                    markerOptions.label = {
+                        text: 'B',
+                        color: '#ffffff',
+                        fontSize: '11px',
+                        fontWeight: 'bold'
+                    };
+                    endMarker = new google.maps.Marker(markerOptions);
+                    
+                    // Add drag listener
+                    endMarker.addListener('dragend', (event) => {
+                        endCoordinates = { lat: event.latLng.lat(), lng: event.latLng.lng() };
+                        reverseGeocodeAndFill(endCoordinates, 'endLocation');
+                        updateCoordsDisplay();
+                        updateRoute();
+                    });
+                }
+            }
+        }
+
+        // Reverse geocode and fill input
+        function reverseGeocodeAndFill(location, inputId) {
+            if (!geocoder) return;
+            
+            geocoder.geocode({ location: location }, (results, status) => {
+                if (status === 'OK' && results[0]) {
+                    document.getElementById(inputId).value = results[0].formatted_address;
+                } else {
+                    // If geocoding fails, just show coordinates
+                    document.getElementById(inputId).value = `${location.lat.toFixed(6)}, ${location.lng.toFixed(6)}`;
+                }
+            });
+        }
+
+        // Update coordinates display
+        function updateCoordsDisplay() {
+            const startCoordsEl = document.getElementById('startCoords');
+            const endCoordsEl = document.getElementById('endCoords');
+            
+            if (startCoordinates) {
+                startCoordsEl.textContent = `${startCoordinates.lat.toFixed(6)}, ${startCoordinates.lng.toFixed(6)}`;
+            } else {
+                startCoordsEl.textContent = 'Not selected';
+            }
+            
+            if (endCoordinates) {
+                endCoordsEl.textContent = `${endCoordinates.lat.toFixed(6)}, ${endCoordinates.lng.toFixed(6)}`;
+            } else {
+                endCoordsEl.textContent = 'Not selected';
+            }
+        }
+
+        // Update route on map
+        function updateRoute() {
+            if (!startCoordinates || !endCoordinates || !directionsService || !directionsRenderer) return;
+
+            const request = {
+                origin: new google.maps.LatLng(startCoordinates.lat, startCoordinates.lng),
+                destination: new google.maps.LatLng(endCoordinates.lat, endCoordinates.lng),
+                travelMode: google.maps.TravelMode.DRIVING
+            };
+
+            directionsService.route(request, (result, status) => {
+                if (status === 'OK') {
+                    directionsRenderer.setDirections(result);
+                    
+                    // Show estimated time
+                    const duration = result.routes[0].legs[0].duration.text;
+                    const distance = result.routes[0].legs[0].distance.text;
+                    showToast('info', 'Route Found', `${distance} • ${duration}`);
+                }
+            });
+        }
+
+        // Fit map to show both markers
+        function fitMapToBounds() {
+            if (!map) return;
+            
+            const bounds = new google.maps.LatLngBounds();
+            
+            if (startCoordinates) {
+                bounds.extend(new google.maps.LatLng(startCoordinates.lat, startCoordinates.lng));
+            }
+            if (endCoordinates) {
+                bounds.extend(new google.maps.LatLng(endCoordinates.lat, endCoordinates.lng));
+            }
+            
+            if (startCoordinates || endCoordinates) {
+                map.fitBounds(bounds);
+                
+                // Don't zoom in too much for single point
+                const listener = google.maps.event.addListener(map, 'idle', () => {
+                    if (map.getZoom() > 16) map.setZoom(16);
+                    google.maps.event.removeListener(listener);
+                });
+            }
+        }
+
+        // Clear location
+        function clearLocation(type) {
+            if (type === 'start') {
+                startCoordinates = null;
+                document.getElementById('startLocation').value = '';
+                if (startMarker) {
+                    startMarker.setMap(null);
+                    startMarker = null;
+                }
+            } else {
+                endCoordinates = null;
+                document.getElementById('endLocation').value = '';
+                if (endMarker) {
+                    endMarker.setMap(null);
+                    endMarker = null;
+                }
+            }
+            
+            updateCoordsDisplay();
+            
+            // Clear route if either point is removed
+            if (directionsRenderer) {
+                directionsRenderer.setDirections({ routes: [] });
+            }
+        }
 
         // Service Worker Registration
         async function registerServiceWorker() {
@@ -360,49 +799,6 @@
             }
         }
 
-        // Initialize Map (simulated without API key)
-        function initMap() {
-            const mapContainer = document.getElementById('map');
-            
-            // Check if Google Maps API is available
-            if (typeof google !== 'undefined' && google.maps) {
-                map = new google.maps.Map(mapContainer, {
-                    center: { lat: 40.7128, lng: -74.0060 },
-                    zoom: 12,
-                    styles: [
-                        { elementType: "geometry", stylers: [{ color: "#1e293b" }] },
-                        { elementType: "labels.text.stroke", stylers: [{ color: "#1e293b" }] },
-                        { elementType: "labels.text.fill", stylers: [{ color: "#94a3b8" }] }
-                    ]
-                });
-                directionsService = new google.maps.DirectionsService();
-                directionsRenderer = new google.maps.DirectionsRenderer({ map });
-            } else {
-                // Simulated map interface
-                mapContainer.innerHTML = `
-                    <div class="h-full bg-gradient-to-br from-slate-700 to-slate-800 rounded-xl flex flex-col items-center justify-center cursor-pointer hover:from-slate-600 hover:to-slate-700 transition" onclick="simulateMapClick()">
-                        <svg class="w-16 h-16 text-blue-400 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"></path>
-                        </svg>
-                        <p class="text-slate-300 font-medium">Interactive Map</p>
-                        <p class="text-xs text-slate-400 mt-1">Enter addresses below or click to select</p>
-                        <div class="mt-4 flex gap-2">
-                            <span class="px-2 py-1 bg-green-500/20 text-green-400 text-xs rounded-full flex items-center gap-1">
-                                <span class="w-2 h-2 bg-green-400 rounded-full"></span> Start
-                            </span>
-                            <span class="px-2 py-1 bg-red-500/20 text-red-400 text-xs rounded-full flex items-center gap-1">
-                                <span class="w-2 h-2 bg-red-400 rounded-full"></span> End
-                            </span>
-                        </div>
-                    </div>
-                `;
-            }
-        }
-
-        function simulateMapClick() {
-            showToast('info', 'Map Selection', 'Enter addresses in the fields below or use current location');
-        }
-
         // Day Button Handlers
         function initializeDayButtons() {
             document.querySelectorAll('.day-btn').forEach(btn => {
@@ -430,14 +826,23 @@
             navigator.geolocation.getCurrentPosition(
                 async (position) => {
                     const { latitude, longitude } = position.coords;
-                    const address = await reverseGeocode(latitude, longitude);
+                    const location = { lat: latitude, lng: longitude };
                     
                     if (type === 'start') {
-                        document.getElementById('startLocation').value = address;
+                        startCoordinates = location;
+                        updateMarker('start', location);
+                        reverseGeocodeAndFill(location, 'startLocation');
                     } else {
-                        document.getElementById('endLocation').value = address;
+                        endCoordinates = location;
+                        updateMarker('end', location);
+                        reverseGeocodeAndFill(location, 'endLocation');
                     }
-                    showToast('success', 'Location Found', address);
+                    
+                    updateCoordsDisplay();
+                    updateRoute();
+                    fitMapToBounds();
+                    
+                    showToast('success', 'Location Found', 'Your current location has been set');
                 },
                 (error) => {
                     showToast('error', 'Error', 'Unable to get your location');
@@ -445,17 +850,34 @@
             );
         }
 
-        async function reverseGeocode(lat, lng) {
-            // In production, use Google Geocoding API
-            return `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
-        }
-
         function swapLocations() {
-            const start = document.getElementById('startLocation');
-            const end = document.getElementById('endLocation');
-            const temp = start.value;
-            start.value = end.value;
-            end.value = temp;
+            const startInput = document.getElementById('startLocation');
+            const endInput = document.getElementById('endLocation');
+            const tempValue = startInput.value;
+            startInput.value = endInput.value;
+            endInput.value = tempValue;
+            
+            const tempCoords = startCoordinates;
+            startCoordinates = endCoordinates;
+            endCoordinates = tempCoords;
+            
+            // Update markers
+            if (startCoordinates) {
+                updateMarker('start', startCoordinates);
+            } else if (startMarker) {
+                startMarker.setMap(null);
+                startMarker = null;
+            }
+            
+            if (endCoordinates) {
+                updateMarker('end', endCoordinates);
+            } else if (endMarker) {
+                endMarker.setMap(null);
+                endMarker = null;
+            }
+            
+            updateCoordsDisplay();
+            updateRoute();
         }
 
         // Route Management
@@ -476,6 +898,8 @@
                 name: name,
                 start: isReturn ? end : start,
                 end: isReturn ? start : end,
+                startCoords: isReturn ? endCoordinates : startCoordinates,
+                endCoords: isReturn ? startCoordinates : endCoordinates,
                 time: time,
                 alertBefore: alertBefore,
                 days: [...selectedDays],
@@ -554,6 +978,8 @@
                 name: route.name + ' (Reverse)',
                 start: route.end,
                 end: route.start,
+                startCoords: route.endCoords,
+                endCoords: route.startCoords,
                 createdAt: new Date().toISOString(),
                 lastNotified: null
             };
@@ -585,6 +1011,22 @@
             document.getElementById('startLocation').value = '';
             document.getElementById('endLocation').value = '';
             document.getElementById('routeName').value = '';
+            startCoordinates = null;
+            endCoordinates = null;
+            
+            if (startMarker) {
+                startMarker.setMap(null);
+                startMarker = null;
+            }
+            if (endMarker) {
+                endMarker.setMap(null);
+                endMarker = null;
+            }
+            if (directionsRenderer) {
+                directionsRenderer.setDirections({ routes: [] });
+            }
+            
+            updateCoordsDisplay();
         }
 
         function saveRoutes() {
@@ -656,6 +1098,11 @@
                             </svg>
                             Check Now
                         </button>
+                        <button onclick="showRouteOnMap(${route.id})" class="p-2 bg-slate-700 hover:bg-slate-600 rounded-lg transition" title="Show on Map">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"></path>
+                            </svg>
+                        </button>
                         <button onclick="duplicateRoute(${route.id})" class="p-2 bg-slate-700 hover:bg-slate-600 rounded-lg transition" title="Duplicate">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
@@ -676,8 +1123,70 @@
             `).join('');
         }
 
+        // Show route on map
+        function showRouteOnMap(id) {
+            const route = routes.find(r => r.id === id);
+            if (!route || !map) return;
+            
+            // Use stored coordinates or geocode addresses
+            if (route.startCoords && route.endCoords) {
+                startCoordinates = route.startCoords;
+                endCoordinates = route.endCoords;
+                
+                document.getElementById('startLocation').value = route.start;
+                document.getElementById('endLocation').value = route.end;
+                
+                updateMarker('start', startCoordinates);
+                updateMarker('end', endCoordinates);
+                updateCoordsDisplay();
+                updateRoute();
+                fitMapToBounds();
+                
+                // Scroll to map
+                document.getElementById('map').scrollIntoView({ behavior: 'smooth', block: 'center' });
+            } else {
+                // Geocode addresses if no coordinates stored
+                geocodeAddress(route.start, (location) => {
+                    if (location) {
+                        startCoordinates = location;
+                        document.getElementById('startLocation').value = route.start;
+                        updateMarker('start', startCoordinates);
+                        
+                        geocodeAddress(route.end, (location2) => {
+                            if (location2) {
+                                endCoordinates = location2;
+                                document.getElementById('endLocation').value = route.end;
+                                updateMarker('end', endCoordinates);
+                                updateCoordsDisplay();
+                                updateRoute();
+                                fitMapToBounds();
+                                
+                                document.getElementById('map').scrollIntoView({ behavior: 'smooth', block: 'center' });
+                            }
+                        });
+                    }
+                });
+            }
+        }
+
+        function geocodeAddress(address, callback) {
+            if (!geocoder) {
+                callback(null);
+                return;
+            }
+            
+            geocoder.geocode({ address: address }, (results, status) => {
+                if (status === 'OK' && results[0]) {
+                    const location = results[0].geometry.location;
+                    callback({ lat: location.lat(), lng: location.lng() });
+                } else {
+                    callback(null);
+                }
+            });
+        }
+
         // Traffic Data Fetching (Simulated - in production use real APIs)
-        async function fetchTrafficData(start, end) {
+        async function fetchTrafficData(start, end, startCoords, endCoords) {
             // Simulate API call delay
             await new Promise(resolve => setTimeout(resolve, 500));
 
@@ -699,14 +1208,26 @@
             return {
                 sources: results,
                 bestRoute: best,
-                mapsUrl: generateMapsUrl(start, end)
+                mapsUrl: generateMapsUrl(start, end, startCoords, endCoords)
             };
         }
 
-        function generateMapsUrl(start, end) {
-            const startEncoded = encodeURIComponent(start);
-            const endEncoded = encodeURIComponent(end);
-            return `https://www.google.com/maps/dir/?api=1&origin=${startEncoded}&destination=${endEncoded}&travelmode=driving`;
+        function generateMapsUrl(start, end, startCoords, endCoords) {
+            let origin, destination;
+            
+            if (startCoords) {
+                origin = `${startCoords.lat},${startCoords.lng}`;
+            } else {
+                origin = encodeURIComponent(start);
+            }
+            
+            if (endCoords) {
+                destination = `${endCoords.lat},${endCoords.lng}`;
+            } else {
+                destination = encodeURIComponent(end);
+            }
+            
+            return `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}&travelmode=driving`;
         }
 
         // Check Route Now
@@ -716,7 +1237,7 @@
 
             showToast('info', 'Checking Traffic...', 'Fetching data from multiple sources');
 
-            const trafficData = await fetchTrafficData(route.start, route.end);
+            const trafficData = await fetchTrafficData(route.start, route.end, route.startCoords, route.endCoords);
 
             const modal = document.getElementById('routeModal');
             const title = document.getElementById('modalTitle');
@@ -799,7 +1320,7 @@
                     saveRoutes();
 
                     // Fetch traffic and notify
-                    const trafficData = await fetchTrafficData(route.start, route.end);
+                    const trafficData = await fetchTrafficData(route.start, route.end, route.startCoords, route.endCoords);
                     sendNotification(route, trafficData);
                 }
             }
@@ -904,11 +1425,12 @@
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') {
                 closeModal();
+                clearMapSelectionMode();
             }
         });
     </script>
 
-    <!-- Google Maps API - Replace YOUR_API_KEY with actual key for production -->
-    <!-- <script src="https://maps.googleapis.com/maps/api/js?key=YOUR_API_KEY&libraries=places&callback=initMap" async defer></script> -->
+    <!-- Google Maps API - Replace YOUR_API_KEY with actual key -->
+    <script src="https://maps.googleapis.com/maps/api/js?key=YOUR_API_KEY&libraries=places&callback=initMap" async defer></script>
 </body>
 </html>
